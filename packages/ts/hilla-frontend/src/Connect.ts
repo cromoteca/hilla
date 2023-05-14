@@ -385,10 +385,29 @@ export class ConnectClient {
         return _obj;
       }, obj);
 
+    const replacer = (_: string, v: any) => {
+      if (v instanceof Date) {
+        return v.toISOString();
+      }
+
+      if (typeof v === 'bigint') {
+        return v.toString();
+      }
+
+      if (v instanceof Map) {
+        return Array.from(v.entries()).reduce((obj: any, [key, value]) => {
+          obj[key] = value;
+          return obj;
+        }, {});
+      }
+
+      return v;
+    };
+
     const request = new Request(`${this.prefix}/${endpoint}/${method}`, {
       method: 'POST',
       headers,
-      body: params !== undefined ? JSON.stringify(nullForUndefined(params)) : undefined,
+      body: params !== undefined ? JSON.stringify(nullForUndefined(params), replacer) : undefined,
     });
 
     // The middleware `context`, includes the call arguments and the request
@@ -398,6 +417,28 @@ export class ConnectClient {
       method,
       params,
       request,
+    };
+
+    const reviver = (_: string, v: any) => {
+      if (v === null || v === undefined) {
+        return undefined;
+      }
+
+      switch (v.__hilla_type) {
+        case 'Date':
+          return new Date(v.value);
+        case 'BigInt':
+          return BigInt(v.value);
+        case 'Map':
+          // eslint-disable-next-line no-case-declarations
+          const map = new Map();
+          for (const { key, value } of v.entries) {
+            map.set(key, value);
+          }
+          return map;
+        default:
+          return v;
+      }
     };
 
     // The internal middleware to assert and parse the response. The internal
@@ -411,7 +452,7 @@ export class ConnectClient {
       const response = await next(context);
       await assertResponseIsOk(response);
       const text = await response.text();
-      return JSON.parse(text, (_, value: any) => (value === null ? undefined : value));
+      return JSON.parse(text, reviver);
     };
 
     // The actual fetch call itself is expressed as a middleware

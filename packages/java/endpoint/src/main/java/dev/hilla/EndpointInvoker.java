@@ -12,12 +12,14 @@ import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import com.fasterxml.jackson.databind.module.SimpleModule;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.ApplicationContext;
@@ -26,6 +28,7 @@ import org.springframework.http.converter.json.Jackson2ObjectMapperBuilder;
 import org.springframework.lang.NonNullApi;
 import org.springframework.util.ClassUtils;
 
+import com.cromoteca.generator.types.DefaultTypeHandler;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -102,6 +105,11 @@ public class EndpointInvoker {
         if (this.endpointMapper != null) {
             this.endpointMapper
                     .registerModule(endpointTransferMapper.getJacksonModule());
+            var module = new SimpleModule();
+            DefaultTypeHandler.ALL.stream()
+                    .map(DefaultTypeHandler::jsonSerializer)
+                    .filter(Objects::nonNull).forEach(module::addSerializer);
+            this.endpointMapper.registerModule(module);
         }
         this.explicitNullableTypeChecker = explicitNullableTypeChecker;
         this.endpointRegistry = endpointRegistry;
