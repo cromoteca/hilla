@@ -15,9 +15,11 @@
  */
 package com.vaadin.hilla;
 
+import com.cromoteca.generator.types.DefaultTypeHandler;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.module.SimpleModule;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.googlecode.gentyref.GenericTypeReflector;
 import com.vaadin.flow.server.VaadinServletContext;
@@ -57,6 +59,7 @@ import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -112,6 +115,11 @@ public class EndpointInvoker {
         if (this.endpointMapper != null) {
             this.endpointMapper
                     .registerModule(endpointTransferMapper.getJacksonModule());
+            var module = new SimpleModule();
+            DefaultTypeHandler.ALL.stream()
+                    .map(DefaultTypeHandler::jsonSerializer)
+                    .filter(Objects::nonNull).forEach(module::addSerializer);
+            this.endpointMapper.registerModule(module);
         }
         this.explicitNullableTypeChecker = explicitNullableTypeChecker;
         this.endpointRegistry = endpointRegistry;
