@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unsafe-member-access */
 import type { ReactiveControllerHost } from '@lit/reactive-element';
 import { ConnectionIndicator, ConnectionState } from '@vaadin/common-frontend';
 import { getCsrfTokenHeadersForEndpointRequest } from './CsrfUtils.js';
@@ -292,9 +293,27 @@ export class ConnectClient {
       ...csrfHeaders,
     };
 
+    const replacer = (_: string, v: any) => {
+      if (v instanceof Date) {
+        return v.toISOString();
+      }
+
+      if (typeof v === 'bigint') {
+        return v.toString();
+      }
+
+      if (v instanceof Map) {
+        return Array.from(v.entries()).reduce((obj: any, [key, value]) => {
+          obj[key] = value;
+          return obj;
+        }, {});
+      }
+
+      return v === undefined ? null : v;
+    };
+
     const request = new Request(`${this.prefix}/${endpoint}/${method}`, {
-      body:
-        params !== undefined ? JSON.stringify(params, (_, value) => (value === undefined ? null : value)) : undefined,
+      body: params !== undefined ? JSON.stringify(params, replacer) : undefined,
       headers,
       method: 'POST',
     });
@@ -308,6 +327,28 @@ export class ConnectClient {
       request,
     };
 
+    const reviver = (_: string, v: any) => {
+      if (v === null || v === undefined) {
+        return undefined;
+      }
+
+      switch (v.__hilla_type) {
+        case 'Date':
+          return new Date(v.value);
+        case 'BigInt':
+          return BigInt(v.value);
+        case 'Map':
+          // eslint-disable-next-line no-case-declarations
+          const map = new Map();
+          for (const { key, value } of v.entries) {
+            map.set(key, value);
+          }
+          return map;
+        default:
+          return v;
+      }
+    };
+
     // The internal middleware to assert and parse the response. The internal
     // response handling should come last after the other middlewares are done
     // with processing the response. That is why this middleware is first
@@ -316,7 +357,7 @@ export class ConnectClient {
       const response = await next(context);
       await assertResponseIsOk(response);
       const text = await response.text();
-      return JSON.parse(text, (_, value: any) => (value === null ? undefined : value));
+      return JSON.parse(text, reviver);
     }
 
     // The actual fetch call itself is expressed as a middleware

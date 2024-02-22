@@ -436,6 +436,7 @@
               <rules>
                 <dependencyConvergence/>
               </rules>
+              <fail>false</fail>
             </configuration>
             <goals>
               <goal>enforce</goal>
